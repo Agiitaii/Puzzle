@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Search Puzzle</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:opsz,wght@9..144,600;9..144,700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#2f3328;
+      --olive:#6f7b4d;
+      --olive-dark:#55603d;
+      --sage:#dfe6cf;
+      --cream:#f8f2e6;
+      --paper:#fffaf0;
+      --gold:#d7b66a;
+      --line:#ded4bf;
+      --shadow:0 18px 40px rgba(67,57,37,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:'DM Sans',sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(255,255,255,.85), transparent 22%),
+        radial-gradient(circle at 85% 20%, rgba(224,229,203,.55), transparent 18%),
+        linear-gradient(135deg,#f5eddc 0%,#f8f2e6 45%,#efe5d2 100%);
+      min-height:calc(100 * min(var(--vh, 1vh), 1vh));
+    }
+    .page-shell{width:100%; min-height:calc(100 * min(var(--vh, 1vh), 1vh));}
+    .title-font{font-family:'Fraunces',serif}
+    .letter-cell{
+      aspect-ratio:1/1;
+      border:1px solid #e7dcc7;
+      background:#fffdf8;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      color:#39402e;
+      font-size:clamp(14px,2.2vw,22px);
+      user-select:none;
+      cursor:pointer;
+      transition:.18s ease;
+      border-radius:10px;
+      position:relative;
+    }
+    .letter-cell:hover{background:#f4f7ed; transform:translateY(-1px)}
+    .letter-cell.selecting{background:#e5ecd6; border-color:#b6c49b; color:#46543b}
+    .letter-cell.found{
+      background:#6f7b4d;
+      border-color:#6f7b4d;
+      color:#fff;
+      box-shadow:0 4px 10px rgba(90,102,63,.18);
+    }
+    .word-item{
+      display:flex; align-items:center; gap:.7rem;
+      padding:.6rem 0;
+      color:#67705b;
+      font-weight:600;
+      letter-spacing:.02em;
+    }
+    .word-item .check-dot{
+      width:20px;height:20px;border:1.5px solid #c8d0b8;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;color:white;
+      transition:.2s ease;
+      flex-shrink:0;
+    }
+    .word-item.found{color:#405235;text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:#92a179}
+    .word-item.found .check-dot{background:#6f7b4d;border-color:#6f7b4d}
+    .word-item .check-dot svg{width:13px;height:13px;display:none}
+    .word-item.found .check-dot svg{display:block}
+    .soft-panel{
+      background:rgba(255,252,245,.82);
+      border:1px solid rgba(222,212,191,.8);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(5px);
+    }
+    .grain{
+      position:absolute; inset:0; pointer-events:none; opacity:.14;
+      background-image: radial-gradient(rgba(58,53,40,.18) .6px, transparent .6px);
+      background-size: 5px 5px;
+      mix-blend-mode:multiply;
+    }
+    .progress-track{height:8px;background:#ece4d3;border-radius:999px;overflow:hidden}
+    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#6f7b4d,#9aaa73);transition:width .3s ease}
+    .complete-banner{display:none}
+    .complete-banner.show{display:flex}
+    .focus-ring:focus-visible{outline:3px solid rgba(111,123,77,.35); outline-offset:3px}
+    @media (max-width: 900px){
+      .main-grid{grid-template-columns:1fr!important}
+    }
+  </style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/resizing_sdk.js" type="text/javascript"></script>
+ <script src="/_sdk/telemetry_sdk.js"></script></head>
+ <body data-template-id="__page-root">
+  <div class="page-shell relative overflow-hidden">
+   <div class="grain"></div>
+   <main class="relative z-10 w-full px-5 py-6 md:px-8 lg:px-10">
+    <div class="max-w-6xl mx-auto">
+     <header class="mb-7 md:mb-9 flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+      <div>
+       <p data-template-id="game-eyebrow" class="canva-text uppercase tracking-[0.28em] text-xs font-bold mb-3"></p>
+       <h1 data-template-id="game-title" class="canva-text title-font leading-none mb-3"></h1>
+       <p data-template-id="game-subtitle" class="canva-text max-w-xl"></p>
+      </div>
+      <div class="inline-flex items-center gap-3 rounded-full border border-[#d8cfbd] bg-[#fffaf0cc] px-4 py-2 w-fit"><i data-lucide="clock-3" class="w-4 h-4 text-[#6f7b4d]"></i> <span data-template-id="timer-label" class="canva-text text-sm uppercase tracking-[0.18em] font-bold"></span> <span id="timer" class="font-bold text-[#46523a] min-w-[44px] text-right">00:00</span>
+      </div>
+     </header>
+     <section class="main-grid grid grid-cols-[minmax(0,1fr)_290px] gap-6 items-start">
+      <section class="soft-panel rounded-[28px] p-4 sm:p-6 md:p-7">
+       <div class="flex items-center justify-between gap-4 mb-5">
+        <div>
+         <h2 data-template-id="board-title" class="canva-text title-font"></h2>
+        </div>
+        <div class="hidden sm:flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[#7d856f] font-bold"><i data-lucide="move-up-right" class="w-4 h-4"></i> <span>Drag to connect</span>
+        </div>
+       </div>
+       <div id="grid" class="grid grid-cols-10 gap-1.5 sm:gap-2"></div>
+       <p data-template-id="helper-text" class="canva-text mt-5"></p>
+       <div id="completeBanner" class="complete-banner mt-5 rounded-2xl bg-[#eef3e5] border border-[#d7e1c9] px-4 py-4 items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-[#6f7b4d] text-white flex items-center justify-center shrink-0"><i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+         <h3 data-template-id="complete-title" class="canva-text font-bold"></h3>
+         <p data-template-id="complete-copy" class="canva-text"></p>
+        </div>
+       </div>
+      </section>
+      <aside class="soft-panel rounded-[28px] p-5 md:p-6">
+       <div class="flex items-center justify-between gap-3 mb-5">
+        <h2 data-template-id="word-list-title" class="canva-text title-font"></h2><i data-lucide="leaf" class="w-5 h-5 text-[#6f7b4d]"></i>
+       </div>
+       <div id="wordList" class="mb-6"></div>
+       <div class="border-t border-[#e4dac9] pt-5">
+        <div class="flex items-center justify-between mb-2"><span data-template-id="progress-label" class="canva-text text-xs uppercase tracking-[0.18em] font-bold"></span> <span id="progressText" class="text-sm font-bold text-[#526044]">0 / 6</span>
+        </div>
+        <div class="progress-track">
+         <div id="progressFill" class="progress-fill"></div>
+        </div>
+       </div><button id="resetBtn" type="button" class="focus-ring canva-button mt-6 w-full rounded-2xl px-4 py-3 font-bold flex items-center justify-center gap-2 transition hover:opacity-90"> <i data-lucide="rotate-ccw" class="w-4 h-4"></i> <span data-template-id="reset-button"></span> </button>
+      </aside>
+     </section>
+    </div>
+   </main>
+  </div>
+  <script src="/_sdk/editing_sdk.js"></script>
+  <script>
+    const words = ["FOREST","RIVER","BLOOM","STONE","MAPLE","FERN"];
+    const gridLetters = [
+      ["F","O","R","E","S","T","A","L","P","Q"],
+      ["D","N","B","H","R","M","K","A","R","I"],
+      ["C","Y","L","O","O","M","P","V","I","V"],
+      ["S","T","O","N","E","D","E","E","V","E"],
+      ["M","A","P","L","E","X","R","N","E","R"],
+      ["W","Q","H","J","T","S","D","F","R","O"],
+      ["G","L","E","A","F","K","C","E","T","N"],
+      ["P","B","Y","U","I","L","A","R","A","T"],
+      ["Z","X","C","V","B","N","M","O","S","L"],
+      ["Q","W","E","R","T","Y","U","I","O","P"]
+    ];
+
+    const solutions = {
+      FOREST:[[0,0],[0,1],[0,2],[0,3],[0,4],[0,5]],
+      RIVER:[[1,8],[2,8],[3,8],[4,8],[5,8]],
+      BLOOM:[[1,2],[2,2],[2,3],[2,4],[2,5]],
+      STONE:[[3,0],[3,1],[3,2],[3,3],[3,4]],
+      MAPLE:[[4,0],[4,1],[4,2],[4,3],[4,4]],
+      FERN:[[5,7],[6,7],[7,7],[8,7]]
+    };
+
+    const grid = document.getElementById('grid');
+    const wordList = document.getElementById('wordList');
+    const progressText = document.getElementById('progressText');
+    const progressFill = document.getElementById('progressFill');
+    const completeBanner = document.getElementById('completeBanner');
+    const timerEl = document.getElementById('timer');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let selected = [];
+    let isDragging = false;
+    let foundWords = new Set();
+    let timerStarted = false;
+    let startTime = null;
+    let timerInterval = null;
+
+    function buildGrid(){
+      grid.innerHTML = '';
+      gridLetters.forEach((row, r) => {
+        row.forEach((letter, c) => {
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'letter-cell focus-ring';
+          cell.textContent = letter;
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.setAttribute('aria-label', `Letter ${letter}, row ${r+1}, column ${c+1}`);
+          cell.addEventListener('pointerdown', startSelect);
+          cell.addEventListener('pointerenter', extendSelect);
+          cell.addEventListener('pointerup', endSelect);
+          grid.appendChild(cell);
+        });
+      });
+    }
+
+    function buildWordList(){
+      wordList.innerHTML = '';
+      words.forEach(word => {
+        const item = document.createElement('div');
+        item.className = 'word-item';
+        item.dataset.word = word;
+        item.innerHTML = `
+          <span class="check-dot"><i data-lucide="check"></i></span>
+          <span>${word}</span>
+        `;
+        wordList.appendChild(item);
+      });
+      lucide.createIcons();
+    }
+
+    function startTimer(){
+      if(timerStarted) return;
+      timerStarted = true;
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2,'0');
+        const secs = String(elapsed % 60).padStart(2,'0');
+        timerEl.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function startSelect(e){
+      e.preventDefault();
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      startTimer();
+      isDragging = true;
+      selected = [];
+      clearSelecting();
+      addCell(e.currentTarget);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+
+    function extendSelect(e){
+      if(!isDragging) return;
+      const cell = e.currentTarget;
+      if(selected.includes(cell)) return;
+      if(isValidNext(cell)) addCell(cell);
+    }
+
+    function endSelect(){
+      if(!isDragging) return;
+      isDragging = false;
+      evaluateSelection();
+      clearSelecting();
+      selected = [];
+    }
+
+    document.addEventListener('pointerup', () => {
+      if(isDragging) endSelect();
+    });
+
+    function addCell(cell){
+      selected.push(cell);
+      cell.classList.add('selecting');
+    }
+
+    function clearSelecting(){
+      document.querySelectorAll('.letter-cell.selecting').forEach(cell => cell.classList.remove('selecting'));
+    }
+
+    function isValidNext(cell){
+      if(selected.length === 0) return true;
+      const prev = selected[selected.length - 1];
+      const r1 = parseInt(prev.dataset.row), c1 = parseInt(prev.dataset.col);
+      const r2 = parseInt(cell.dataset.row), c2 = parseInt(cell.dataset.col);
+      const dr = r2 - r1, dc = c2 - c1;
+      if(Math.abs(dr) > 1 || Math.abs(dc) > 1) return false;
+      if(selected.length === 1) return true;
+      const first = selected[0];
+      const second = selected[1];
+      const baseDr = parseInt(second.dataset.row) - parseInt(first.dataset.row);
+      const baseDc = parseInt(second.dataset.col) - parseInt(first.dataset.col);
+      return dr === baseDr && dc === baseDc;
+    }
+
+    function evaluateSelection(){
+      const coords = selected.map(cell => [parseInt(cell.dataset.row), parseInt(cell.dataset.col)]);
+      const reversed = [...coords].reverse();
+
+      for(const word of words){
+        if(foundWords.has(word)) continue;
+        const target = solutions[word];
+        if(matches(coords,target) || matches(reversed,target)){
+          foundWords.add(word);
+          selected.forEach(cell => cell.classList.add('found'));
+          const wordItem = document.querySelector(`[data-word="${word}"]`);
+          wordItem?.classList.add('found');
+          updateProgress();
+          return;
+        }
+      }
+    }
+
+    function matches(a,b){
+      if(a.length !== b.length) return false;
+      return a.every((pair,i) => pair[0] === b[i][0] && pair[1] === b[i][1]);
+    }
+
+    function updateProgress(){
+      const count = foundWords.size;
+      progressText.textContent = `${count} / ${words.length}`;
+      progressFill.style.width = `${(count / words.length) * 100}%`;
+      if(count === words.length){
+        clearInterval(timerInterval);
+        completeBanner.classList.add('show');
+      }
+    }
+
+    function resetGame(){
+      foundWords.clear();
+      selected = [];
+      isDragging = false;
+      clearInterval(timerInterval);
+      timerStarted = false;
+      startTime = null;
+      timerEl.textContent = '00:00';
+      completeBanner.classList.remove('show');
+      document.querySelectorAll('.letter-cell').forEach(cell => cell.classList.remove('found','selecting'));
+      document.querySelectorAll('.word-item').forEach(item => item.classList.remove('found'));
+      updateProgress();
+    }
+
+    resetBtn.addEventListener('click', resetGame);
+
+    buildGrid();
+    buildWordList();
+    updateProgress();
+    lucide.createIcons();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a07cdfcdc9c98f82',t:'MTc4MDgwNjEzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
